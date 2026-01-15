@@ -1,19 +1,27 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+#[AllowDynamicProperties]
 class Kasir_model extends CI_Model {
 
+    // 1. Ambil semua data barang
     public function get_all_barang() {
         return $this->db->get('barang')->result();
     }
 
+    // 2. Ambil satu barang berdasarkan ID (INI YANG TADI DUPLIKAT)
+    public function get_barang_by_id($id) {
+        return $this->db->get_where('barang', array('id' => $id))->row();
+    }
+
+    // 3. Simpan Transaksi
     public function simpan_transaksi($data_input) {
         // Gunakan Transaction agar data konsisten (semua sukses atau semua gagal)
         $this->db->trans_start();
 
-        // 1. Simpan ke tabel penjualan (Header)
+        // A. Simpan ke tabel penjualan (Header)
         $data_penjualan = array(
-            'no_transaksi' => 'TRX-' . time(), // Contoh no ref unik
+            'no_transaksi' => 'TRX-' . time(),
             'tanggal'      => date('Y-m-d H:i:s'),
             'total_bayar'  => $data_input['grand_total']
         );
@@ -22,7 +30,7 @@ class Kasir_model extends CI_Model {
         // Ambil ID penjualan yang baru saja dibuat
         $id_penjualan = $this->db->insert_id();
 
-        // 2. Simpan ke detail_penjualan & Kurangi Stok (Looping)
+        // B. Simpan ke detail_penjualan & Kurangi Stok (Looping)
         $jumlah_barang = count($data_input['barang_id']);
         
         for ($i = 0; $i < $jumlah_barang; $i++) {

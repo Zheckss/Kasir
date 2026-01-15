@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Aplikasi Kasir Sederhana</title>
+    <title>Aplikasi Kasir (Mode AJAX)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
@@ -12,13 +12,14 @@
                 <h4>Point of Sales (Kasir)</h4>
             </div>
             <div class="card-body">
+                
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <select id="pilih_barang" class="form-control">
                             <option value="">-- Pilih Barang --</option>
                             <?php foreach($barang as $b): ?>
-                                <option value="<?php echo $b->id; ?>" data-harga="<?php echo $b->harga; ?>" data-nama="<?php echo $b->nama_barang; ?>">
-                                    <?php echo $b->nama_barang; ?> - Rp <?php echo number_format($b->harga); ?> (Stok: <?php echo $b->stok; ?>)
+                                <option value="<?php echo $b->id; ?>">
+                                    <?php echo $b->nama_barang; ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -61,34 +62,82 @@
             </div>
         </div>
     </div>
-
-    <script>
+<script>
         $(document).ready(function(){
             let total_belanja = 0;
+            
+            // Variabel penampung sementara
+            let barang_selected = {
+                id: "",
+                nama: "",
+                harga: 0,
+                stok: 0
+            };
 
-            $("#tambah_barang").click(function(){
-                // Ambil data dari inputan
-                let id_barang = $("#pilih_barang").val();
-                let nama_barang = $("#pilih_barang option:selected").data('nama');
-                let harga = $("#pilih_barang option:selected").data('harga');
-                let qty = $("#qty").val();
+            // 1. EVENT SAAT BARANG DIPILIH (CHANGE)
+            $("#pilih_barang").change(function(){
+                let id_barang = $(this).val();
 
-                if(id_barang == "" || qty <= 0) {
-                    alert("Pilih barang dan jumlah yang benar!");
+                if(id_barang == "") {
+                    barang_selected = {id: "", nama: "", harga: 0, stok: 0};
                     return;
                 }
 
-                let subtotal = harga * qty;
+                // Tampilkan loading text (opsional)
+                console.log("Sedang mengambil data untuk ID: " + id_barang);
 
-                // Buat baris HTML baru untuk tabel
-                // Perhatikan name="barang_id[]" menggunakan kurung siku [] agar bisa dikirim sebagai array ke controller
+                $.ajax({
+                    // PERHATIKAN: Saya tambahkan index.php jaga-jaga kalau .htaccess belum disetting
+                    url: "<?php echo base_url('index.php/kasir/get_item_json'); ?>", 
+                    method: "POST",
+                    data: {id: id_barang},
+                    dataType: "json",
+                    success: function(response) {
+                        // Jika SUKSES
+                        console.log("Data diterima:", response);
+                        if(response == null) {
+                            alert("Data Barang Kosong / Tidak Ditemukan di Database!");
+                            return;
+                        }
+                        barang_selected.id = response.id;
+                        barang_selected.nama = response.nama_barang;
+                        barang_selected.harga = parseInt(response.harga); 
+                        barang_selected.stok = parseInt(response.stok);
+                        alert("Sukses! Barang dipilih: " + response.nama_barang); // Konfirmasi visual
+                    },
+                    error: function(xhr, status, error) {
+                        // INI BAGIAN PENTINGNYA (DETEKTIF ERROR)
+                        // Akan muncul popup berisi pesan error asli dari server
+                        alert("TERJADI ERROR!\n\nStatus: " + status + "\nPesan: " + error + "\n\nRespon Server:\n" + xhr.responseText);
+                    }
+                });
+            });
+
+            // 2. EVENT SAAT TOMBOL TAMBAH DIKLIK
+            $("#tambah_barang").click(function(){
+                // Cek apakah data sudah masuk?
+                if(barang_selected.id == "") {
+                    alert("Pilih barang dulu! (Pastikan muncul alert 'Sukses' saat memilih dropdown)");
+                    return;
+                }
+
+                let qty = parseInt($("#qty").val());
+                
+                // Validasi Stok
+                if(qty > barang_selected.stok) {
+                    alert("Stok tidak cukup! Sisa: " + barang_selected.stok);
+                    return; 
+                }
+
+                let subtotal = barang_selected.harga * qty;
+
                 let html = `
                     <tr>
                         <td>
-                            ${nama_barang}
-                            <input type="hidden" name="barang_id[]" value="${id_barang}">
+                            ${barang_selected.nama}
+                            <input type="hidden" name="barang_id[]" value="${barang_selected.id}">
                         </td>
-                        <td>Rp ${harga}</td>
+                        <td>Rp ${barang_selected.harga}</td>
                         <td>
                             ${qty}
                             <input type="hidden" name="qty[]" value="${qty}">
@@ -97,34 +146,32 @@
                             Rp ${subtotal}
                             <input type="hidden" name="subtotal[]" value="${subtotal}">
                         </td>
-                        <td><button type="button" class="btn btn-danger btn-sm hapus-baris" data-sub="${subtotal}">Hapus</button></td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm hapus-baris" data-sub="${subtotal}">Hapus</button>
+                        </td>
                     </tr>
                 `;
 
-                // Masukkan ke tbody
                 $("#keranjang tbody").append(html);
 
-                // Update Total Belanja
                 total_belanja += subtotal;
                 $("#tampilan_total").text("Rp " + total_belanja);
                 $("#grand_total").val(total_belanja);
 
-                // Reset input
                 $("#pilih_barang").val("");
                 $("#qty").val(1);
+                barang_selected = {id: "", nama: "", harga: 0, stok: 0};
             });
 
-            // Fitur Hapus Baris
+            // 3. FITUR HAPUS BARIS
             $(document).on('click', '.hapus-baris', function(){
                 let sub = $(this).data('sub');
                 total_belanja -= sub;
-                
                 $("#tampilan_total").text("Rp " + total_belanja);
                 $("#grand_total").val(total_belanja);
-                
                 $(this).closest('tr').remove();
             });
         });
-    </script>
+    </script>>
 </body>
 </html>

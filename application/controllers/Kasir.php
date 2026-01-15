@@ -1,61 +1,65 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-/**
- * @property Kasir_model $Kasir_model
- * @property CI_Input $input
- * @property CI_Loader $load
- */
-
-#[AllowDynamicProperties] // Fix untuk PHP 8.2+
+#[AllowDynamicProperties]
 class Kasir extends CI_Controller {
 
-    // 1. CONSTRUCTOR
     public function __construct() {
         parent::__construct();
-        // Load Model & Helper
         $this->load->model('Kasir_model');
         $this->load->helper(array('url', 'form'));
     }
 
-    // 2. INDEX: Menampilkan Halaman Kasir
     public function index() {
-        // Ambil data barang dari Model
         $data['barang'] = $this->Kasir_model->get_all_barang();
-        
-        // Tampilkan View
         $this->load->view('kasir_view', $data);
     }
 
-    // 3. PROSES BAYAR: Menangani Logika Transaksi
+    // --- INI FUNGSI YANG KITA GANTI ---
+    // Sekarang isinya sudah mengambil data asli dari Database via Model
+    public function get_item_json() {
+        // Matikan error reporting biar JSON bersih
+        error_reporting(0);
+        ini_set('display_errors', 0);
+        
+        // Header JSON
+        header('Content-Type: application/json');
+
+        // 1. Ambil ID yang dikirim dari View
+        $id_barang = $this->input->post('id');
+
+        // 2. Panggil Model untuk ambil data ASLI dari Database
+        $data_barang = $this->Kasir_model->get_barang_by_id($id_barang);
+
+        // 3. Kirim balik ke View
+        echo json_encode($data_barang);
+    }
+    // ----------------------------------
+
     public function proses_bayar() {
-        // Ambil semua data inputan
         $input = $this->input->post();
 
-        // Validasi: Cek apakah ada barang yang dipilih?
         if (empty($input['barang_id'])) {
              echo "<script>
-                    alert('Keranjang belanja kosong! Mohon pilih barang terlebih dahulu.'); 
+                    alert('Keranjang belanja kosong!'); 
                     window.history.back();
                   </script>";
              return; 
         }
 
-        // Panggil Model untuk simpan transaksi
         $simpan = $this->Kasir_model->simpan_transaksi($input);
 
-        // Cek hasil penyimpanan
         if ($simpan) {
             echo "<script>
-                    alert('Transaksi Berhasil Disimpan!'); 
+                    alert('Transaksi Berhasil!'); 
                     window.location='".base_url('kasir')."';
                   </script>";
         } else {
             echo "<script>
-                    alert('Transaksi Gagal! Cek stok atau database.'); 
+                    alert('Gagal!'); 
                     window.history.back();
                   </script>";
         }
     }
 
-} // <--- PENUTUP CLASS HANYA SATU DI SINI (PALING BAWAH)
+} // Penutup Class
