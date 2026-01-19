@@ -73,7 +73,6 @@
             </div>
         </div>
     </div>
-
 <script>
     $(document).ready(function(){
         let total_belanja = 0;
@@ -84,6 +83,10 @@
             harga: 0,
             stok: 0
         };
+
+        function formatRupiah(angka) {
+            return new Intl.NumberFormat('id-ID').format(angka);
+        }
 
         $("#pilih_barang").change(function(){
             let id_barang = $(this).val();
@@ -110,7 +113,9 @@
                     barang_selected.nama = response.nama_barang;
                     barang_selected.harga = parseInt(response.harga); 
                     barang_selected.stok = parseInt(response.stok);
-                    alert("Sukses! Barang dipilih: " + response.nama_barang); 
+
+                    let harga_indo = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(response.harga);
+                    alert("Sukses! Barang dipilih: " + response.nama_barang + "\nHarga: " + harga_indo); 
                 },
                 error: function(xhr, status, error) {
                     alert("TERJADI ERROR!\n\nStatus: " + status + "\nPesan: " + error + "\n\nRespon Server:\n" + xhr.responseText);
@@ -133,19 +138,22 @@
 
             let subtotal = barang_selected.harga * qty;
 
+            let harga_tampil = formatRupiah(barang_selected.harga);
+            let subtotal_tampil = formatRupiah(subtotal);
+
             let html = `
                 <tr>
                     <td>
                         ${barang_selected.nama}
                         <input type="hidden" name="barang_id[]" value="${barang_selected.id}">
                     </td>
-                    <td>Rp ${barang_selected.harga}</td>
+                    <td>Rp ${harga_tampil}</td>
                     <td>
                         ${qty}
                         <input type="hidden" name="qty[]" value="${qty}">
                     </td>
                     <td>
-                        Rp ${subtotal}
+                        Rp ${subtotal_tampil}
                         <input type="hidden" name="subtotal[]" value="${subtotal}">
                     </td>
                     <td>
@@ -157,7 +165,7 @@
             $("#keranjang tbody").append(html);
 
             total_belanja += subtotal;
-            $("#tampilan_total").text("Rp " + total_belanja);
+            $("#tampilan_total").text("Rp " + formatRupiah(total_belanja)); 
             $("#grand_total").val(total_belanja);
 
             $("#pilih_barang").val("");
@@ -168,19 +176,21 @@
         $(document).on('click', '.hapus-baris', function(){
             let sub = $(this).data('sub');
             total_belanja -= sub;
-            $("#tampilan_total").text("Rp " + total_belanja);
+            
+            $("#tampilan_total").text("Rp " + formatRupiah(total_belanja)); 
             $("#grand_total").val(total_belanja);
+            
             $(this).closest('tr').remove();
         });
+
     });
 </script>
+
 <?php if($this->session->flashdata('last_trx_id')): ?>
     <script>
         $(document).ready(function(){
             let id_trx = "<?php echo $this->session->flashdata('last_trx_id'); ?>";
-            
             let mau_cetak = confirm("Transaksi Berhasil! \nApakah ingin mencetak struk untuk TRX ID: " + id_trx + "?");
-            
             if(mau_cetak) {
                 let url = "<?php echo base_url('index.php/kasir/cetak_struk/'); ?>" + id_trx;
                 window.open(url, '_blank');
